@@ -1,5 +1,8 @@
 {
-  "name": "",
-  "description": "",
-  "requestFramePermissions": []
+  "name": "OmniGuide AI",
+  "description": "A multimodal AI agent that sees your world and guides you in real time using Gemini vision and voice.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
 }

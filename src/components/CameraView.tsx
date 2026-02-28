@@ -20,18 +20,37 @@ export const CameraView: React.FC<CameraViewProps> = ({ videoRef, isActive }) =>
   }, [isActive]);
 
   const startCamera = async () => {
+    setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      });
+      // Try environment camera first (back camera)
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+      } catch (e) {
+        console.warn('Environment camera failed, falling back to default', e);
+        // Fallback to any available camera
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
       setError(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error accessing camera:', err);
-      setError('Could not access camera. Please check permissions.');
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setError('Camera access denied. Please allow camera permissions in your browser settings and refresh.');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError('No camera found on this device.');
+      } else {
+        setError(`Error accessing camera: ${err.message || 'Unknown error'}`);
+      }
     }
   };
 

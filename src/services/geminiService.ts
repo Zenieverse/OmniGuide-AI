@@ -39,6 +39,7 @@ export async function analyzeScene(
     config: {
       systemInstruction: SYSTEM_INSTRUCTIONS[mode],
       responseMimeType: "application/json",
+      tools: [{ googleSearch: {} }],
       responseSchema: {
         type: Type.OBJECT,
         properties: {
