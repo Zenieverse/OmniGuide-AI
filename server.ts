@@ -40,17 +40,47 @@ async function startServer() {
           history: []
         };
 
-        const result = await analyzeScene(data.image, data.speech, data.mode, session.history);
+        const result = await analyzeScene(data.image, data.speech, data.mode, session.history.map(m => ({ role: m.role, content: m.content })));
 
-        // Update session history
-        session.history.push({ role: 'user', content: data.speech });
-        session.history.push({ role: 'model', content: result.speech });
+        // Update session history with full message objects
+        const userMsg = { 
+          role: 'user' as const, 
+          content: data.speech, 
+          timestamp: Date.now(), 
+          mode: data.mode,
+          image: data.image
+        };
+        const modelMsg = { 
+          role: 'model' as const, 
+          content: result.analysis, 
+          timestamp: Date.now(), 
+          mode: data.mode 
+        };
+
+        session.history.push(userMsg);
+        session.history.push(modelMsg);
         storageService.saveSession(session);
 
-        socket.emit("response", result);
+        socket.emit("response", { ...result, history: session.history });
       } catch (error) {
         console.error("Analysis error:", error);
         socket.emit("error", { message: "Failed to analyze scene" });
+      }
+    });
+
+    socket.on("get_history", (sessionId: string) => {
+      const session = storageService.getSession(sessionId);
+      if (session) {
+        socket.emit("history", session.history);
+      }
+    });
+
+    socket.on("clear_history", (sessionId: string) => {
+      const session = storageService.getSession(sessionId);
+      if (session) {
+        session.history = [];
+        storageService.saveSession(session);
+        socket.emit("history", []);
       }
     });
 

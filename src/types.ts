@@ -5,6 +5,14 @@ export enum AppMode {
   GENERAL = 'general'
 }
 
+export enum AgentStatus {
+  IDLE = 'idle',
+  LISTENING = 'listening',
+  THINKING = 'thinking',
+  SPEAKING = 'speaking',
+  ERROR = 'error'
+}
+
 export interface OverlayInstruction {
   type: 'highlight' | 'arrow' | 'label' | 'circle';
   target?: string;
@@ -22,9 +30,23 @@ export interface GeminiResponse {
   overlay?: OverlayInstruction[];
 }
 
+export interface Message {
+  role: 'user' | 'model';
+  content: string;
+  timestamp: number;
+  mode: AppMode;
+  image?: string;
+}
+
 export interface SessionContext {
   id: string;
   mode: AppMode;
-  history: { role: 'user' | 'model'; content: string }[];
+  history: Message[];
   lastDetectedObjects?: string[];
+}
+
+export interface AppSettings {
+  voiceEnabled: boolean;
+  autoAnalyze: boolean;
+  cameraResolution: '720p' | '1080p';
 }

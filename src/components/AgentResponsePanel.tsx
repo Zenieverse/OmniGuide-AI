@@ -1,18 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bot, Volume2 } from 'lucide-react';
+import { Bot, Volume2, Share2 } from 'lucide-react';
 
 interface AgentResponsePanelProps {
   response: string;
   isProcessing: boolean;
+  voiceEnabled: boolean;
 }
 
-export const AgentResponsePanel: React.FC<AgentResponsePanelProps> = ({ response, isProcessing }) => {
+export const AgentResponsePanel: React.FC<AgentResponsePanelProps> = ({ response, isProcessing, voiceEnabled }) => {
   const speakRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
-    if (response) {
+    if (response && voiceEnabled) {
       // Stop current speech
       window.speechSynthesis.cancel();
 
@@ -27,8 +28,10 @@ export const AgentResponsePanel: React.FC<AgentResponsePanelProps> = ({ response
 
       window.speechSynthesis.speak(utterance);
       speakRef.current = utterance;
+    } else if (!voiceEnabled) {
+      window.speechSynthesis.cancel();
     }
-  }, [response]);
+  }, [response, voiceEnabled]);
 
   return (
     <div className="w-full max-w-2xl">
@@ -47,7 +50,21 @@ export const AgentResponsePanel: React.FC<AgentResponsePanelProps> = ({ response
               <div className="flex-1 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-widest text-indigo-400/60">OmniGuide AI</span>
-                  {response && <Volume2 className="w-4 h-4 text-indigo-400/40 animate-pulse" />}
+                  <div className="flex items-center gap-3">
+                    {response && (
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(response);
+                          alert('Copied to clipboard!');
+                        }}
+                        className="p-1.5 hover:bg-white/5 rounded-lg transition-colors"
+                        title="Copy to clipboard"
+                      >
+                        <Share2 className="w-4 h-4 text-white/20 hover:text-indigo-400 transition-colors" />
+                      </button>
+                    )}
+                    {response && <Volume2 className="w-4 h-4 text-indigo-400/40 animate-pulse" />}
+                  </div>
                 </div>
                 <div className="text-white/90 leading-relaxed prose prose-invert prose-sm max-w-none">
                   {isProcessing && !response ? (

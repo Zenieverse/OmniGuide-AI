@@ -6,38 +6,66 @@ import { VoiceInput } from './components/VoiceInput';
 import { OverlayCanvas } from './components/OverlayCanvas';
 import { ModeSelector } from './components/ModeSelector';
 import { AgentResponsePanel } from './components/AgentResponsePanel';
-import { AppMode, GeminiResponse, OverlayInstruction } from './types';
-import { Sparkles, Info, Play, Github } from 'lucide-react';
+import { HistoryPanel } from './components/HistoryPanel';
+import { SettingsModal } from './components/SettingsModal';
+import { AppMode, GeminiResponse, OverlayInstruction, Message, AppSettings, AgentStatus } from './types';
+import { Sparkles, Info, Play, Github, History as HistoryIcon, Settings as SettingsIcon, Camera, LayoutGrid, Activity, Share2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>(AppMode.GENERAL);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [status, setStatus] = useState<AgentStatus>(AgentStatus.IDLE);
   const [response, setResponse] = useState<string>('');
   const [overlays, setOverlays] = useState<OverlayInstruction[]>([]);
-  const [sessionId] = useState(() => Math.random().toString(36).substring(7));
+  const [history, setHistory] = useState<Message[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<AppSettings>({
+    voiceEnabled: true,
+    autoAnalyze: false,
+    cameraResolution: '720p'
+  });
   
+  const [sessionId] = useState(() => Math.random().toString(36).substring(7));
   const videoRef = useRef<HTMLVideoElement>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
+    (window as any).clearHistory = () => {
+      socketRef.current?.emit('clear_history', sessionId);
+      setHistory([]);
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
     socketRef.current = io();
 
-    socketRef.current.on('response', (data: GeminiResponse) => {
+    socketRef.current.on('response', (data: GeminiResponse & { history: Message[] }) => {
       setResponse(data.analysis);
       setOverlays(data.overlay || []);
-      setIsProcessing(false);
+      setHistory(data.history);
+      setStatus(AgentStatus.SPEAKING);
+      
+      // Reset status after a while if not speaking
+      setTimeout(() => setStatus(AgentStatus.IDLE), 5000);
+    });
+
+    socketRef.current.on('history', (data: Message[]) => {
+      setHistory(data);
     });
 
     socketRef.current.on('error', (err) => {
       console.error('Socket error:', err);
-      setIsProcessing(false);
+      setStatus(AgentStatus.ERROR);
     });
+
+    // Request initial history
+    socketRef.current.emit('get_history', sessionId);
 
     return () => {
       socketRef.current?.disconnect();
     };
-  }, []);
+  }, [sessionId]);
 
   const captureFrame = useCallback(() => {
     if (!videoRef.current) return null;
@@ -53,7 +81,7 @@ export default function App() {
   const handleSpeech = (text: string) => {
     if (!text.trim()) return;
     
-    setIsProcessing(true);
+    setStatus(AgentStatus.THINKING);
     const frame = captureFrame();
     
     if (frame && socketRef.current) {
@@ -64,133 +92,242 @@ export default function App() {
         sessionId
       });
     } else {
-      setIsProcessing(false);
-      setResponse("I need to see through your camera to help you. Please make sure it's enabled.");
+      setStatus(AgentStatus.ERROR);
+      setResponse("Vision required. Please ensure camera access is granted.");
     }
   };
 
   const runDemo = () => {
     confetti({
-      particleCount: 100,
-      spread: 70,
+      particleCount: 150,
+      spread: 100,
       origin: { y: 0.6 },
-      colors: ['#6366f1', '#a855f7', '#ec4899']
+      colors: ['#6366f1', '#a855f7', '#ec4899', '#10b981']
     });
     
     const demos = {
-      [AppMode.APPLIANCE_FIXER]: "Why is my sink leaking?",
-      [AppMode.HOMEWORK_TUTOR]: "Can you solve this math problem?",
-      [AppMode.COOKING_ASSISTANT]: "What can I make with these ingredients?",
-      [AppMode.GENERAL]: "What do you see in front of me?"
+      [AppMode.APPLIANCE_FIXER]: "Identify the components of this device.",
+      [AppMode.HOMEWORK_TUTOR]: "Help me understand this problem.",
+      [AppMode.COOKING_ASSISTANT]: "What can I cook with these?",
+      [AppMode.GENERAL]: "Describe the scene in front of me."
     };
     
     handleSpeech(demos[mode]);
   };
 
+  const triggerManualCapture = () => {
+    handleSpeech("Analyze this scene for me.");
+  };
+
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-indigo-500/30">
-      {/* Background gradients */}
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-indigo-500/30 overflow-x-hidden">
+      {/* Dynamic Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 blur-[120px] rounded-full" />
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.1, 1],
+            opacity: [0.05, 0.1, 0.05]
+          }}
+          transition={{ duration: 10, repeat: Infinity }}
+          className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-500/10 blur-[150px] rounded-full" 
+        />
+        <motion.div 
+          animate={{ 
+            scale: [1.1, 1, 1.1],
+            opacity: [0.05, 0.1, 0.05]
+          }}
+          transition={{ duration: 12, repeat: Infinity }}
+          className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-500/10 blur-[150px] rounded-full" 
+        />
       </div>
 
-      <main className="relative z-10 container mx-auto px-4 py-8 flex flex-col items-center gap-8 max-w-5xl">
-        {/* Header */}
-        <header className="w-full flex flex-col md:flex-row items-center justify-between gap-6">
+      <main className="relative z-10 container mx-auto px-4 py-6 flex flex-col items-center gap-6 max-w-6xl">
+        {/* Top Navigation Bar */}
+        <header className="w-full flex items-center justify-between gap-4 bg-white/5 backdrop-blur-xl border border-white/10 p-4 rounded-3xl shadow-xl">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg shadow-indigo-500/20">
-              <Sparkles className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
-                OmniGuide AI
-              </h1>
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-indigo-400/80">
-                Multimodal Live Agent
-              </p>
+            <motion.div 
+              whileHover={{ rotate: 15 }}
+              className="p-2.5 bg-indigo-500 rounded-xl shadow-lg shadow-indigo-500/20"
+            >
+              <Sparkles className="w-6 h-6 text-white" />
+            </motion.div>
+            <div className="hidden sm:block">
+              <h1 className="text-xl font-black tracking-tighter">OmniGuide AI</h1>
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${status === AgentStatus.ERROR ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/40">System Active</span>
+              </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <ModeSelector currentMode={mode} onModeChange={setMode} />
+            <div className="h-8 w-[1px] bg-white/10 mx-2" />
             <button 
-              onClick={runDemo}
-              className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all group"
-              title="Run Demo Scenario"
+              onClick={() => setIsHistoryOpen(true)}
+              className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all relative"
             >
-              <Play className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
+              <HistoryIcon className="w-5 h-5 text-white/60" />
+              {history.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500 text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-[#050505]">
+                  {Math.min(history.length / 2, 9)}
+                </span>
+              )}
+            </button>
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all"
+            >
+              <SettingsIcon className="w-5 h-5 text-white/60" />
             </button>
           </div>
         </header>
 
-        {/* Main Interface */}
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Vision */}
-          <section className="lg:col-span-7 space-y-6">
-            <div className="relative">
+        {/* Main Content Grid */}
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          {/* Left: Vision & Tools */}
+          <section className="lg:col-span-8 space-y-4 flex flex-col">
+            <div className="relative flex-1 min-h-[400px]">
               <CameraView videoRef={videoRef} isActive={true} />
               <OverlayCanvas instructions={overlays} videoRef={videoRef} />
+              
+              {/* Floating Camera Controls */}
+              <div className="absolute bottom-6 right-6 flex flex-col gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={triggerManualCapture}
+                  className="p-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl group"
+                >
+                  <Camera className="w-6 h-6 text-white group-hover:text-indigo-400 transition-colors" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={runDemo}
+                  className="p-4 bg-indigo-500 border border-indigo-400 rounded-2xl shadow-2xl shadow-indigo-500/40 group"
+                >
+                  <Play className="w-6 h-6 text-white" />
+                </motion.button>
+              </div>
+
+              {/* Status Indicator Overlay */}
+              <div className="absolute top-6 right-6 px-4 py-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-full flex items-center gap-3">
+                <Activity className={`w-4 h-4 ${status === AgentStatus.THINKING ? 'text-indigo-400 animate-spin' : 'text-white/40'}`} />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/80">
+                  {status === AgentStatus.IDLE ? 'Ready' : status}
+                </span>
+              </div>
             </div>
             
-            <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-2 text-white/40">
-                <Info className="w-4 h-4" />
-                <span className="text-xs font-medium">Point your camera and speak naturally</span>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-white/5 border border-white/10 p-4 rounded-3xl flex items-center gap-4">
+                <div className="p-2 bg-indigo-500/20 rounded-xl">
+                  <LayoutGrid className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Active Mode</p>
+                  <p className="text-sm font-bold">{mode.replace('_', ' ')}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-4">
-                <a href="#" className="text-white/20 hover:text-white/40 transition-colors">
-                  <Github className="w-5 h-5" />
-                </a>
+              <div className="bg-white/5 border border-white/10 p-4 rounded-3xl flex items-center gap-4">
+                <div className="p-2 bg-emerald-500/20 rounded-xl">
+                  <Activity className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Latency</p>
+                  <p className="text-sm font-bold">~1.1s</p>
+                </div>
+              </div>
+              <div className="bg-white/5 border border-white/10 p-4 rounded-3xl flex items-center gap-4">
+                <div className="p-2 bg-orange-500/20 rounded-xl">
+                  <Info className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Session</p>
+                  <p className="text-sm font-bold">#{sessionId}</p>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Right Column: Interaction */}
-          <section className="lg:col-span-5 flex flex-col gap-8 h-full">
-            <div className="flex-1 flex flex-col items-center justify-center gap-12 py-8">
-              {/* AI Orb Animation */}
+          {/* Right: Interaction & Response */}
+          <section className="lg:col-span-4 flex flex-col gap-6">
+            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 flex-1 flex flex-col items-center justify-center gap-10 relative overflow-hidden">
+              {/* Background Glow */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none" />
+              
               <div className="relative">
                 <motion.div
                   animate={{
-                    scale: isProcessing ? [1, 1.2, 1] : 1,
-                    rotate: isProcessing ? 360 : 0,
+                    scale: status === AgentStatus.THINKING ? [1, 1.2, 1] : 1,
+                    rotate: status === AgentStatus.THINKING ? 360 : 0,
+                    opacity: status === AgentStatus.THINKING ? 0.8 : 0.4
                   }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                  className={`w-32 h-32 rounded-full blur-2xl opacity-50 ${
-                    isProcessing ? 'bg-indigo-500' : 'bg-indigo-400/30'
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  className={`w-40 h-40 rounded-full blur-3xl ${
+                    status === AgentStatus.THINKING ? 'bg-indigo-500' : 'bg-indigo-400'
                   }`}
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className={`w-16 h-16 rounded-full border-2 border-white/10 flex items-center justify-center backdrop-blur-xl ${
-                    isProcessing ? 'animate-pulse' : ''
+                  <div className={`w-20 h-20 rounded-full border-2 border-white/10 flex items-center justify-center backdrop-blur-2xl shadow-2xl ${
+                    status === AgentStatus.THINKING ? 'animate-pulse border-indigo-500/50' : ''
                   }`}>
-                    <Sparkles className={`w-6 h-6 ${isProcessing ? 'text-indigo-400' : 'text-white/20'}`} />
+                    <Sparkles className={`w-8 h-8 ${status === AgentStatus.THINKING ? 'text-indigo-400' : 'text-white/40'}`} />
                   </div>
                 </div>
               </div>
 
-              <VoiceInput onSpeech={handleSpeech} isProcessing={isProcessing} />
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-bold">How can I help?</h3>
+                <p className="text-sm text-white/40 px-4">Speak naturally or use the manual capture button to analyze the scene.</p>
+              </div>
+
+              <VoiceInput 
+                onSpeech={handleSpeech} 
+                isProcessing={status === AgentStatus.THINKING} 
+              />
             </div>
 
-            <AgentResponsePanel response={response} isProcessing={isProcessing} />
+            <AgentResponsePanel 
+              response={response} 
+              isProcessing={status === AgentStatus.THINKING} 
+              voiceEnabled={settings.voiceEnabled}
+            />
           </section>
         </div>
 
         {/* Footer */}
-        <footer className="w-full pt-12 pb-4 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] font-bold uppercase tracking-widest text-white/20">
-          <p>© 2026 OmniGuide AI • Gemini Live Agent Challenge</p>
-          <div className="flex gap-6">
-            <span className="hover:text-indigo-400/60 cursor-help transition-colors">Latency: ~1.2s</span>
-            <span className="hover:text-indigo-400/60 cursor-help transition-colors">Model: Gemini 2.5 Flash</span>
-            <span className="hover:text-indigo-400/60 cursor-help transition-colors">Status: Operational</span>
+        <footer className="w-full pt-8 pb-4 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] font-bold uppercase tracking-widest text-white/20">
+          <div className="flex items-center gap-6">
+            <p>© 2026 OmniGuide AI</p>
+            <a href="#" className="hover:text-indigo-400 transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-indigo-400 transition-colors">Terms of Service</a>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+              Gemini 2.5 Flash Engine
+            </span>
+            <a href="https://github.com" className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+              <Github className="w-4 h-4" />
+            </a>
           </div>
         </footer>
       </main>
+
+      {/* Overlays */}
+      <HistoryPanel 
+        isOpen={isHistoryOpen} 
+        onClose={() => setIsHistoryOpen(false)} 
+        messages={history} 
+      />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        settings={settings} 
+        onSettingsChange={setSettings} 
+      />
     </div>
   );
 }

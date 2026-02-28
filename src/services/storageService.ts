@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { SessionContext, AppMode } from '../types';
+import { SessionContext, AppMode, Message } from '../types';
 
 const db = new Database('omniguide.db');
 
@@ -32,11 +32,16 @@ export const storageService = {
     const stmt = db.prepare('SELECT * FROM sessions WHERE id = ?');
     const row = stmt.get(id) as any;
     if (!row) return null;
-    return {
-      id: row.id,
-      mode: row.mode as AppMode,
-      history: JSON.parse(row.history),
-      lastDetectedObjects: JSON.parse(row.last_detected_objects)
-    };
+    try {
+      return {
+        id: row.id,
+        mode: row.mode as AppMode,
+        history: JSON.parse(row.history),
+        lastDetectedObjects: JSON.parse(row.last_detected_objects)
+      };
+    } catch (e) {
+      console.error("Failed to parse session history", e);
+      return null;
+    }
   }
 };
