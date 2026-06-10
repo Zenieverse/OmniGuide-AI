@@ -1,6 +1,7 @@
 # OmniGuide AI — Gemini Live Agent
 
 https://ai.studio/apps/45306c88-5ec7-428f-b4d0-ca106771381a
+ or https://omniguide-ai-764082783379.us-west1.run.app
  
 “An AI that sees your world and guides you in real time.”
 
