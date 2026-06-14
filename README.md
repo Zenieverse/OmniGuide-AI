@@ -1,5 +1,7 @@
 # OmniGuide AI — Gemini Live Agent
 
+https://omniguide-ai-764082783379.us-west1.run.app
+
 “An AI that sees your world and guides you in real time.”
 
 OmniGuide AI is a multimodal AI system built for the Gemini Live Agent Challenge. It demonstrates real-time interaction using vision, speech, and live responses.
