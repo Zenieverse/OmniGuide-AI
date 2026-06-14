@@ -1,7 +1,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AppMode, GeminiResponse } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+let aiInstance: GoogleGenAI | null = null;
+
+function getGeminiClient(): GoogleGenAI {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is required but is missing or empty.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 const SYSTEM_INSTRUCTIONS = {
   [AppMode.APPLIANCE_FIXER]: "You are an expert appliance repair technician. Analyze the image and the user's question. Identify components, potential issues, and provide step-by-step guidance. Return structured JSON with 'analysis', 'speech' (what you will say), and 'overlay' (visual markers for the camera feed).",
@@ -18,7 +29,7 @@ export async function analyzeScene(
 ): Promise<GeminiResponse> {
   const model = "gemini-2.5-flash"; // Fast and multimodal
   
-  const response = await ai.models.generateContent({
+  const response = await getGeminiClient().models.generateContent({
     model,
     contents: [
       {
